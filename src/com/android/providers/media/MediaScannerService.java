@@ -41,10 +41,19 @@ import android.os.storage.StorageManager;
 import android.os.storage.StorageVolume;
 import android.provider.MediaStore;
 import android.util.Log;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
+import android.preference.PreferenceManager;
+
+
 
 import java.io.File;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Collections;
+
 
 public class MediaScannerService extends Service implements Runnable
 {
@@ -84,7 +93,50 @@ public class MediaScannerService extends Service implements Runnable
         return scanner;
     }
 
+
+    public  String [] filterDirectories(String[] directories)
+    {
+        HashSet<String> dirs = new HashSet<String>();
+
+        SharedPreferences katprefs = getSharedPreferences("filters", 0);
+        if(katprefs  == null)  return directories;
+
+        boolean scanOn =  katprefs.getBoolean("scan", true);
+        boolean alwaysAddDirs =  katprefs.getBoolean("always_add_dirs", false);
+        if(!scanOn && !alwaysAddDirs) return dirs.toArray(new String[0]);
+
+        String sAddDirsToScan = katprefs.getString("add_dirs", null);
+        String sWhiteList = katprefs.getString("white_list", null);
+        String sBlackList = katprefs.getString("black_list", null);
+        Set<String> addDirsToScan = initSet(sAddDirsToScan), whiteList = initSet(sWhiteList), blackList = initSet(sBlackList);
+
+        //if(whiteList == null) return directories;
+
+        Log.d("KAT-"+TAG, "scanOn:" + scanOn );
+        Log.d("KAT-"+TAG, "alwaysAddDirs:" + alwaysAddDirs );
+        Log.d("KAT-"+TAG, "addDirsToScan:" + addDirsToScan );
+        Log.d("KAT-"+TAG, "whiteList:" + whiteList );
+        Log.d("KAT-"+TAG, "blackList:" + blackList );
+
+        if(scanOn)
+                for(String dir : directories)
+                        if((whiteList == null || whiteList.contains(dir)) && (blackList == null || !blackList.contains(dir)))
+                                dirs.add(dir);
+
+        if(addDirsToScan != null)
+                    for(String dir : addDirsToScan)
+                        dirs.add(dir);
+
+        return dirs.toArray(new String[0]);
+    }
+
+
     private void scan(String[] directories, String volumeName) {
+        Log.d("KAT-"+TAG, "ori:" + Arrays.asList(directories) );
+        directories = filterDirectories(directories);
+        Log.d("KAT-"+TAG, "after:" + Arrays.asList(directories) );
+        if(directories == null || directories.length == 0) return;
+
         Uri uri = Uri.parse("file://" + directories[0]);
         // don't sleep while scanning
         mWakeLock.acquire();
@@ -210,7 +262,7 @@ public class MediaScannerService extends Service implements Runnable
             new IMediaScannerService.Stub() {
         public void requestScanFile(String path, String mimeType, IMediaScannerListener listener)
         {
-            if (false) {
+            if (true) {
                 Log.d(TAG, "IMediaScannerService.scanFile: " + path + " mimeType: " + mimeType);
             }
             Bundle args = new Bundle();
@@ -266,10 +318,10 @@ public class MediaScannerService extends Service implements Runnable
                     }
 
                     if (directories != null) {
-                        if (false) Log.d(TAG, "start scanning volume " + volume + ": "
+                        if (true) Log.d(TAG, "start scanning volume " + volume + ": "
                                 + Arrays.toString(directories));
                         scan(directories, volume);
-                        if (false) Log.d(TAG, "done scanning volume " + volume);
+                        if (true) Log.d(TAG, "done scanning volume " + volume);
                     }
                 }
             } catch (Exception e) {
@@ -279,5 +331,17 @@ public class MediaScannerService extends Service implements Runnable
             stopSelf(msg.arg1);
         }
     };
+
+    private HashSet<String> initSet( String val)
+    {
+        HashSet<String> outSet = null;
+        if(val != null && !val.equals(""))
+                {
+                outSet = new HashSet<String>();
+                Collections.addAll(outSet, val.split(";"));
+                }
+        return outSet;
+    }
+
 }
 

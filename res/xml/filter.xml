@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" android:title="K.A.T - MediaScannerService Filters">
+    <CheckBoxPreference android:title="Scan" android:key="scan" android:defaultValue="true" android:summary="If unchecked scan orders will be discarded"/>
+    <CheckBoxPreference android:title="Force Always Add Directories" android:key="always_add_dirs" android:summary='If checked, will add the directories in the "always add directory list" even if Scan is unchecked' android:defaultValue="false" />
+	<EditTextPreference android:title="Always Add Directories List" android:summary="These directories will always be added to the scan order" android:key="add_dirs" android:dialogMessage="(  Separate directory values with ;  )" />
+        <PreferenceCategory android:title="White List or Black List Mode">
+    	<EditTextPreference android:title="White List" android:key="white_list" android:dialogMessage="(  Separate directory values with ;  )" android:summary="White List has precedence over Black List, if not empty black list will be ignored. If you use whitelist don't forget to add /system/media to it"/>
+    	<EditTextPreference android:title="Black List" android:key="black_list" android:dialogMessage="(  Separate directory values with ;  )" />
+    </PreferenceCategory>
+    
+    
+    
+PreferenceScreen</PreferenceScreen>
