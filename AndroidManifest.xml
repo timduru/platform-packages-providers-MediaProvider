@@ -89,6 +89,10 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <activity android:name="com.android.providers.media.MediaScannerServiceFilter"
+                android:exported="true"
+        ></activity>
+
 
     </application>
 </manifest>
