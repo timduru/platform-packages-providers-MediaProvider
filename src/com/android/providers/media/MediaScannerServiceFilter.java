@@ -19,7 +19,7 @@ public class MediaScannerServiceFilter extends PreferenceActivity
 
 		PreferenceManager prefMgr = getPreferenceManager();
 		prefMgr.setSharedPreferencesName("filters");
-		prefMgr.setSharedPreferencesMode(MODE_WORLD_READABLE);
+		prefMgr.setSharedPreferencesMode(MODE_PRIVATE);
 
 		addPreferencesFromResource(R.xml.filter);
 	}    
