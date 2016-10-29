@@ -33,9 +33,12 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.PowerManager;
 import android.os.Process;
+import android.os.UserManager;
 import android.os.storage.StorageManager;
 import android.provider.MediaStore;
 import android.util.Log;
+
+import com.android.internal.util.ArrayUtils;
 
 import java.io.File;
 import java.util.Arrays;
@@ -275,7 +278,7 @@ public class MediaScannerService extends Service implements Runnable {
                 } else {
                     String volume = arguments.getString("volume");
                     String[] directories = null;
-                    
+
                     if (MediaProvider.INTERNAL_VOLUME.equals(volume)) {
                         // scan internal media storage
                         directories = new String[] {
@@ -285,7 +288,13 @@ public class MediaScannerService extends Service implements Runnable {
                     }
                     else if (MediaProvider.EXTERNAL_VOLUME.equals(volume)) {
                         // scan external storage volumes
-                        directories = mExternalStoragePaths;
+                        if (getSystemService(UserManager.class).isDemoUser()) {
+                            directories = ArrayUtils.appendElement(String.class,
+                                    mExternalStoragePaths,
+                                    Environment.getDataPreloadsMediaDirectory().getAbsolutePath());
+                        } else {
+                            directories = mExternalStoragePaths;
+                        }
                     }
 
                     if (directories != null) {
