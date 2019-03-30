@@ -1660,10 +1660,6 @@ public class MediaProvider extends ContentProvider {
             db.execSQL("UPDATE files SET storage_id=" + StorageVolume.STORAGE_ID_PRIMARY + ";");
         }
 
-        if (fromVersion < 403 && !internal) {
-            db.execSQL("CREATE VIEW audio_genres_map_noid AS " +
-                    "SELECT audio_id,genre_id from audio_genres_map;");
-        }
 
         if (fromVersion < 404) {
             // There was a bug that could cause distinct same-named albums to be
@@ -1803,8 +1799,16 @@ public class MediaProvider extends ContentProvider {
                     ");");
             db.execSQL("INSERT INTO audio_genres_map_tmp (audio_id,genre_id)" +
                     " SELECT DISTINCT audio_id,genre_id FROM audio_genres_map;");
+            db.execSQL("DROP TRIGGER IF EXISTS audio_genres_cleanup");
+
             db.execSQL("DROP TABLE audio_genres_map;");
             db.execSQL("ALTER TABLE audio_genres_map_tmp RENAME TO audio_genres_map;");
+            db.execSQL("CREATE TRIGGER IF NOT EXISTS audio_genres_cleanup DELETE ON audio_genres " +
+                       "BEGIN " +
+                           "DELETE FROM audio_genres_map WHERE genre_id = old._id;" +
+                       "END");
+            db.execSQL("CREATE VIEW audio_genres_map_noid AS " +
+                    "SELECT audio_id,genre_id from audio_genres_map;");
         }
 
         if (fromVersion < 509) {
@@ -1857,7 +1861,109 @@ public class MediaProvider extends ContentProvider {
             // copy data from old table, squashing entries with duplicate _data
             db.execSQL("INSERT OR REPLACE INTO files2 SELECT * FROM files;");
             db.execSQL("DROP TABLE files;");
+
+            db.execSQL("DROP VIEW IF EXISTS album_info");
+            db.execSQL("DROP VIEW IF EXISTS artists_albums_map");
+            db.execSQL("DROP VIEW IF EXISTS search");
+            db.execSQL("DROP VIEW IF EXISTS searchhelpertitle");
+            db.execSQL("DROP VIEW IF EXISTS artist_info");
+            db.execSQL("DROP VIEW IF EXISTS audio_playlists");
+            db.execSQL("DROP VIEW IF EXISTS audio_meta");
+            db.execSQL("DROP VIEW IF EXISTS audio");
+            db.execSQL("DROP VIEW IF EXISTS images");
+            db.execSQL("DROP VIEW IF EXISTS video");
+
             db.execSQL("ALTER TABLE files2 RENAME TO files;");
+
+
+            db.execSQL("CREATE VIEW IF NOT EXISTS album_info AS " +
+                    "SELECT audio.album_id AS _id, album, album_key, " +
+                    "MIN(year) AS minyear, " +
+                    "MAX(year) AS maxyear, artist, artist_id, artist_key, " +
+                    "count(*) AS " + MediaStore.Audio.Albums.NUMBER_OF_SONGS +
+                    ",album_art._data AS album_art" +
+                    " FROM audio LEFT OUTER JOIN album_art ON audio.album_id=album_art.album_id" +
+                    " WHERE is_music=1 GROUP BY audio.album_id;");
+
+
+            db.execSQL("CREATE VIEW IF NOT EXISTS artists_albums_map AS " +
+                    "SELECT DISTINCT artist_id, album_id FROM audio_meta;");
+
+            db.execSQL("CREATE VIEW IF NOT EXISTS searchhelpertitle AS SELECT * FROM audio " +
+                    "ORDER BY title_key;");
+
+            db.execSQL("CREATE VIEW IF NOT EXISTS search AS " +
+                    "SELECT _id," +
+                    "'artist' AS mime_type," +
+                    "artist," +
+                    "NULL AS album," +
+                    "NULL AS title," +
+                    "artist AS text1," +
+                    "NULL AS text2," +
+                    "number_of_albums AS data1," +
+                    "number_of_tracks AS data2," +
+                    "artist_key AS match," +
+                    "'content://media/external/audio/artists/'||_id AS suggest_intent_data," +
+                    "1 AS grouporder " +
+                    "FROM artist_info WHERE (artist!='" + MediaStore.UNKNOWN_STRING + "') " +
+                "UNION ALL " +
+                    "SELECT _id," +
+                    "'album' AS mime_type," +
+                    "artist," +
+                    "album," +
+                    "NULL AS title," +
+                    "album AS text1," +
+                    "artist AS text2," +
+                    "NULL AS data1," +
+                    "NULL AS data2," +
+                    "artist_key||' '||album_key AS match," +
+                    "'content://media/external/audio/albums/'||_id AS suggest_intent_data," +
+                    "2 AS grouporder " +
+                    "FROM album_info WHERE (album!='" + MediaStore.UNKNOWN_STRING + "') " +
+                "UNION ALL " +
+                    "SELECT searchhelpertitle._id AS _id," +
+                    "mime_type," +
+                    "artist," +
+                    "album," +
+                    "title," +
+                    "title AS text1," +
+                    "artist AS text2," +
+                    "NULL AS data1," +
+                    "NULL AS data2," +
+                    "artist_key||' '||album_key||' '||title_key AS match," +
+                    "'content://media/external/audio/media/'||searchhelpertitle._id AS " +
+                    "suggest_intent_data," +
+                    "3 AS grouporder " +
+                    "FROM searchhelpertitle WHERE (title != '') "
+                    );
+
+            db.execSQL("CREATE VIEW IF NOT EXISTS artist_info AS " +
+                        "SELECT artist_id AS _id, artist, artist_key, " +
+                        "COUNT(DISTINCT album_key) AS number_of_albums, " +
+                        "COUNT(*) AS number_of_tracks FROM audio WHERE is_music=1 "+
+                        "GROUP BY artist_key;");
+
+            if (!internal) {
+                db.execSQL("CREATE VIEW audio_playlists AS SELECT _id," + PLAYLIST_COLUMNS +
+                        " FROM files WHERE " + FileColumns.MEDIA_TYPE + "="
+                        + FileColumns.MEDIA_TYPE_PLAYLIST + ";");
+            }
+
+            db.execSQL("CREATE VIEW audio_meta AS SELECT _id," + AUDIO_COLUMNSv405 +
+                        " FROM files WHERE " + FileColumns.MEDIA_TYPE + "="
+                        + FileColumns.MEDIA_TYPE_AUDIO + ";");
+
+            recreateAudioView(db);
+
+            db.execSQL("CREATE VIEW images AS SELECT _id," + IMAGE_COLUMNS +
+                        " FROM files WHERE " + FileColumns.MEDIA_TYPE + "="
+                        + FileColumns.MEDIA_TYPE_IMAGE + ";");
+            db.execSQL("CREATE VIEW video AS SELECT _id," + VIDEO_COLUMNS +
+                        " FROM files WHERE " + FileColumns.MEDIA_TYPE + "="
+                        + FileColumns.MEDIA_TYPE_VIDEO + ";");
+
+
+
 
             // recreate indices and triggers
             db.execSQL("CREATE INDEX album_id_idx ON files(album_id);");
